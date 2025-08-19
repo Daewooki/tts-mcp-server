@@ -23,6 +23,11 @@ dotenv.config({ path: path.join(projectRoot, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+// 퍼블릭 경로 프리픽스(예: Nginx로 /tts 하위에 노출 시 '/tts', Cloud Run은 기본 '')
+const PUBLIC_BASE_PATH_RAW = (process.env.PUBLIC_BASE_PATH || '').trim();
+const PUBLIC_BASE_PATH = (!PUBLIC_BASE_PATH_RAW || PUBLIC_BASE_PATH_RAW === '/')
+  ? ''
+  : (PUBLIC_BASE_PATH_RAW.startsWith('/') ? PUBLIC_BASE_PATH_RAW : `/${PUBLIC_BASE_PATH_RAW}`);
 const AUTH_TOKEN = process.env.AUTH_TOKEN || 'your-secret-token'; // (미사용) OAuth 미지원 환경 대응으로 인증 비활성화
 // Nginx 프록시 하에서 req.protocol, req.ip 등을 신뢰
 app.set('trust proxy', true);
@@ -85,8 +90,8 @@ app.get('/sse', async (req, res) => {
     const forwardedHost = req.get('x-forwarded-host');
     const scheme = forwardedProto || req.protocol || 'http';
     const host = forwardedHost || req.get('host');
-    // Nginx 공개 경로(/tts/messages)로 안내하여 404 방지
-    const publicEndpointPath = '/tts/messages';
+    // 공개 경로: Cloud Run("") 또는 Nginx("/tts") 등 환경에 맞춰 조정
+    const publicEndpointPath = `${PUBLIC_BASE_PATH}/messages`;
     const absoluteEndpoint = `${scheme}://${host}${publicEndpointPath}`;
 
     sseTransport = new SSEServerTransport(absoluteEndpoint, res);
